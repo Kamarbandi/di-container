@@ -7,6 +7,7 @@ namespace Azad\Container\Tests;
 use PHPUnit\Framework\TestCase;
 use Azad\Container\Container;
 use Azad\Container\Exception\NotFoundException;
+use Azad\Container\Tests\Fixtures\SimpleService;
 
 final class DelegateTest extends TestCase
 {
@@ -42,5 +43,27 @@ final class DelegateTest extends TestCase
         $this->expectException(NotFoundException::class);
 
         $container->get('nowhere.to.be.found');
+    }
+
+    public function testMakeFallsBackToADelegateContainerWhenNotFoundLocally(): void
+    {
+        $delegate = new Container();
+        $delegate->set('shared.value', 'from-delegate');
+
+        $container = new Container();
+        $container->delegate($delegate);
+
+        self::assertSame('from-delegate', $container->make('shared.value'));
+    }
+
+    public function testMakePropagatesToADelegateContainerOfTheSameType(): void
+    {
+        $delegate = new Container();
+        $delegate->factory('svc', static fn (): SimpleService => new SimpleService());
+
+        $container = new Container();
+        $container->delegate($delegate);
+
+        self::assertNotSame($container->make('svc'), $container->make('svc'));
     }
 }

@@ -55,7 +55,7 @@ final class AutowireDefinition implements DefinitionInterface
         return $this->className;
     }
 
-    public function resolve(Container $container, array $parameterOverrides = []): mixed
+    public function resolve(Container $container, array $parameterOverrides = [], bool $fresh = false): mixed
     {
         return $container->instantiate($this->className, [...$this->parameters, ...$parameterOverrides]);
     }

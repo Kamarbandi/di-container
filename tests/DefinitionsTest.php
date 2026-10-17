@@ -104,6 +104,20 @@ final class DefinitionsTest extends TestCase
         self::assertSame('one-off-key', $service->apiKey);
     }
 
+    public function testMakeThroughAnAliasBypassesTheSharedCache(): void
+    {
+        $container = new Container();
+        $container->singleton(SimpleService::class);
+        $container->alias('svc', SimpleService::class);
+
+        $shared = $container->get('svc');
+        $fresh = $container->make('svc');
+
+        self::assertInstanceOf(SimpleService::class, $fresh);
+        self::assertNotSame($shared, $fresh);
+        self::assertSame($shared, $container->get('svc'));
+    }
+
     public function testConstructorAcceptsAnIterableOfDefinitions(): void
     {
         $definitions = (static function (): iterable {

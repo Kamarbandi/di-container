@@ -26,8 +26,10 @@ final class AliasDefinition implements DefinitionInterface
         return false;
     }
 
-    public function resolve(Container $container, array $parameterOverrides = []): mixed
+    public function resolve(Container $container, array $parameterOverrides = [], bool $fresh = false): mixed
     {
-        return $container->get($this->target);
+        return $fresh
+            ? $container->make($this->target, $parameterOverrides)
+            : $container->get($this->target);
     }
 }

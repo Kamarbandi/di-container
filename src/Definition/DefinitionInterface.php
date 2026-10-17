@@ -19,6 +19,7 @@ interface DefinitionInterface
 
     /**
      * @param array<string, mixed> $parameterOverrides Named constructor-parameter overrides, used by make().
+     * @param bool $fresh When true (make()), aliases must bypass the shared cache of their target.
      */
-    public function resolve(Container $container, array $parameterOverrides = []): mixed;
+    public function resolve(Container $container, array $parameterOverrides = [], bool $fresh = false): mixed;
 }

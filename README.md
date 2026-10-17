@@ -170,7 +170,7 @@ $container->delegate($frameworkContainer);
 * Variadic parameters (`Foo ...$items`) default to an empty list; override them via `make($id, ['items' => [...]])` or `define()->parameter('items', [...])`.
 * Untyped parameters only resolve if they have a default value.
 * Intersection types (`Foo&Bar`) aren't autowired — they raise a clear `UnresolvableParameterException` instead of a fatal error.
-* Circular dependencies are detected before instantiation and reported with the full resolution chain.
+* Circular dependencies (constructor chains, factory closures, and aliases) are detected and reported with the full resolution chain.
 
 Setter/property injection is intentionally not supported — the library is built around constructor injection and `readonly` classes.
 

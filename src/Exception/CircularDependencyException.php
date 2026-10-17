@@ -13,7 +13,7 @@ use function sprintf;
 class CircularDependencyException extends ContainerException
 {
     /**
-     * @param list<string> $stack Classes currently being resolved, in resolution order.
+     * @param list<string> $stack Entry ids / class names currently being resolved, in order.
      */
     public static function forStack(array $stack, string $target): self
     {

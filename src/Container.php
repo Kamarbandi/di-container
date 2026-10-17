@@ -53,7 +53,7 @@ class Container implements PsrContainerInterface
     /** @var array<string, list<string>> */
     private array $tags = [];
 
-    /** @var list<class-string> */
+    /** @var list<string> Entry ids and class names currently being built. */
     private array $resolutionStack = [];
 
     /** @var list<PsrContainerInterface> */
@@ -106,11 +106,12 @@ class Container implements PsrContainerInterface
         $this->bootDeferredProvider($id);
 
         if (isset($this->definitions[$id])) {
-            return $this->resolveDefinition($id, $this->definitions[$id], []);
+            return $this->resolveRegistered($id, $this->definitions[$id], []);
         }
 
         if ($this->isAutowirable($id)) {
             /** @var class-string $id */
+            // instantiate() owns the stack entry for the class name.
             $instance = $this->instantiate($id, []);
             $this->resolved[$id] = $instance;
             $this->frozen[$id] = true;
@@ -192,12 +193,24 @@ class Container implements PsrContainerInterface
         $this->bootDeferredProvider($id);
 
         if (isset($this->definitions[$id])) {
-            return $this->resolveDefinition($id, $this->definitions[$id], $parameters, cache: false);
+            return $this->resolveRegistered($id, $this->definitions[$id], $parameters, cache: false);
         }
 
         if ($this->isAutowirable($id)) {
             /** @var class-string $id */
             return $this->instantiate($id, $parameters);
+        }
+
+        foreach ($this->delegates as $delegate) {
+            if (!$delegate->has($id)) {
+                continue;
+            }
+
+            // Prefer make() on our own type so parameter overrides and cache
+            // bypass propagate; fall back to get() for arbitrary PSR-11 delegates.
+            return $delegate instanceof self
+                ? $delegate->make($id, $parameters)
+                : $delegate->get($id);
         }
 
         throw new NotFoundException(sprintf('No entry or class found for "%s".', $id));
@@ -432,6 +445,54 @@ class Container implements PsrContainerInterface
     }
 
     /**
+     * Resolves a registered definition. Factories and aliases are tracked on
+     * the resolution stack by entry id; AutowireDefinition is not — instantiate()
+     * already pushes the concrete class, and pushing the same id twice would
+     * false-positive when $id === $className (e.g. singleton(Foo::class)).
+     *
+     * @param array<string, mixed> $overrides
+     */
+    private function resolveRegistered(
+        string $id,
+        DefinitionInterface $definition,
+        array $overrides,
+        bool $cache = true
+    ): mixed {
+        if ($definition instanceof AutowireDefinition) {
+            return $this->resolveDefinition($id, $definition, $overrides, $cache);
+        }
+
+        return $this->whileResolving(
+            $id,
+            fn (): mixed => $this->resolveDefinition($id, $definition, $overrides, $cache)
+        );
+    }
+
+    /**
+     * Pushes $id onto the resolution stack for the duration of $callback so
+     * circular lookups through factories, aliases and nested get()/make()
+     * calls are detected before they recurse unboundedly.
+     *
+     * @template T
+     * @param callable(): T $callback
+     * @return T
+     */
+    private function whileResolving(string $id, callable $callback): mixed
+    {
+        if (in_array($id, $this->resolutionStack, true)) {
+            throw CircularDependencyException::forStack($this->resolutionStack, $id);
+        }
+
+        $this->resolutionStack[] = $id;
+
+        try {
+            return $callback();
+        } finally {
+            array_pop($this->resolutionStack);
+        }
+    }
+
+    /**
      * @param array<string, mixed> $overrides
      */
     private function resolveDefinition(
@@ -441,10 +502,10 @@ class Container implements PsrContainerInterface
         bool $cache = true
     ): mixed {
         if (!$cache || !$definition->isShared()) {
-            return $definition->resolve($this, $overrides);
+            return $definition->resolve($this, $overrides, fresh: !$cache);
         }
 
-        $value = $definition->resolve($this, $overrides);
+        $value = $definition->resolve($this, $overrides, fresh: false);
         $this->resolved[$id] = $value;
         $this->frozen[$id] = true;
 

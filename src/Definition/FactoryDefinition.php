@@ -24,7 +24,7 @@ final class FactoryDefinition implements DefinitionInterface
         return $this->shared;
     }
 
-    public function resolve(Container $container, array $parameterOverrides = []): mixed
+    public function resolve(Container $container, array $parameterOverrides = [], bool $fresh = false): mixed
     {
         return ($this->factory)($container);
     }
